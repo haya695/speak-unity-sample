@@ -79,9 +79,10 @@ public class SpeakSDKManager : MonoBehaviour
         }
     }
 
-    public void OnDestroy()
+    public void OnApplicationQuit()
     {
-        Speak.Instance().Dispose();
+        Speak.Instance().Stop(OnStop);
+        while (Speak.Instance().Poll(true)) { }
     }
 
     public void setSpeakingFlag(bool speakingFlag){
