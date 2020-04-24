@@ -1,3 +1,30 @@
+/*
+ * Copyright (c) 2020, NTT DOCOMO, INC.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *  Redistributions of source code must retain the above copyright notice,
+ *   this list of conditions and the following disclaimer.
+ *  Redistributions in binary form must reproduce the above copyright notice,
+ *   this list of conditions and the following disclaimer in the documentation
+ *   and/or other materials provided with the distribution.
+ *  Neither the name of the NTT DOCOMO, INC. nor the names of its contributors
+ *   may be used to endorse or promote products derived from this software
+ *   without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL NTT DOCOMO, INC. BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
 using UnityEngine;
 using NTTDocomo.Speak;
 using System;
@@ -56,7 +83,7 @@ public class SpeakSDKManager : MonoBehaviour
         ColorUtility.TryParseHtmlString("#98FB98",out mOnColor);
         ColorUtility.TryParseHtmlString("#DCDCDC",out mOffColor);
         mSendButton.image.color = mOffColor;
-        setSpeakingFlag(false);
+        SetSpeakingFlag(false);
     }
 
     public void Update()
@@ -79,13 +106,19 @@ public class SpeakSDKManager : MonoBehaviour
         }
     }
 
-    public void OnApplicationQuit()
+    void OnApplicationPause(bool pauseStatus)
+    {
+		Speak.Instance().Stop(OnStop);
+		while (Speak.Instance().Poll(true)) { }
+    }
+
+    void OnApplicationQuit()
     {
         Speak.Instance().Stop(OnStop);
         while (Speak.Instance().Poll(true)) { }
     }
 
-    public void setSpeakingFlag(bool speakingFlag){
+    public void SetSpeakingFlag(bool speakingFlag){
         if(speakingFlag)
         {
             mStartButton.image.color = mOnColor;
@@ -169,13 +202,13 @@ public class SpeakSDKManager : MonoBehaviour
     // ---------------------------------------------------------------------------- //
     public void OnStart()
     {
-        setSpeakingFlag(true);
+        SetSpeakingFlag(true);
     }
 
 
     public void OnStop()
     {
-        setSpeakingFlag(false);
+        SetSpeakingFlag(false);
     }
 
     public void OnFailed(int ecode, string failstr)
@@ -191,12 +224,12 @@ public class SpeakSDKManager : MonoBehaviour
     // ---------------------------------------------------------------------------- //
     //  メタ情報を受信した時に呼ばれるメソッド
     //  
-    //  登録例 : Speak.setOnMetaOut += this.onMetaOut;
+    //  登録例 : Speak.Instance().SetOnMetaOut(OnMetaOut);
     //  引数(string) : JSON形式のメタ情報
     // ---------------------------------------------------------------------------- //
-    public void OnMetaOut(string mateText)
+    public void OnMetaOut(string metaText)
     {
-        var metaData = OnMetaOutJson.CreateFromJSON(mateText);
+        var metaData = OnMetaOutJson.CreateFromJSON(metaText);
         // 再生テキスト内容
         if (metaData.systemText.utterance != null && metaData.systemText.utterance != "")
         {
@@ -214,16 +247,16 @@ public class SpeakSDKManager : MonoBehaviour
     // ---------------------------------------------------------------------------- //
     //  対話テキストを受信した時に呼ばれるメソッド
     //  
-    //  登録例 : Speak.setOnTextOut += this.onTextOut;
+    //  登録例 : Speak.Instance().SetOnTextOut(OnTextOut);
     //  引数(string) : JSON形式の対話テキスト情報
     // ---------------------------------------------------------------------------- //
-    public void OnTextOut(string mateText)
+    public void OnTextOut(string metaText)
     {
         // スクロールビューにテキストを表示する
         // 発話内容
-        var speecMetaData = OnTextOutJson.CreateFromJSON(mateText);
+        var speechMetaData = OnTextOutJson.CreateFromJSON(metaText);
         string viewText = "";
-        viewText = MetaFindVoiceText(speecMetaData);
+        viewText = MetaFindVoiceText(speechMetaData);
         if (viewText != null && viewText != "")
         {
             LogView(viewText);
