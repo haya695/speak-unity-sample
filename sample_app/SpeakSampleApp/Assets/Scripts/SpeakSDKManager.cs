@@ -30,6 +30,7 @@ using NTTDocomo.Speak;
 using System;
 using System.Collections.Generic;
 using UnityEngine.UI;
+using System.Threading;
 #if PLATFORM_ANDROID
 using UnityEngine.Android;
 #endif
@@ -58,6 +59,11 @@ public class SpeakSDKManager : MonoBehaviour
     // 未選択状態の色
     private Color mOffColor;
 
+    // 自動停止
+    private static readonly float TIMEOUT = 10.000f;//10000/ms
+    private int mDialogCounter  = 0;
+    private SynchronizationContext mContext;
+
     public void Start()
     {
         #if (PLATFORM_ANDROID)
@@ -84,6 +90,9 @@ public class SpeakSDKManager : MonoBehaviour
         ColorUtility.TryParseHtmlString("#DCDCDC",out mOffColor);
         mSendButton.image.color = mOffColor;
         SetSpeakingFlag(false);
+
+        //コンテキストの取得
+        mContext = SynchronizationContext.Current;
     }
 
     public void Update()
@@ -142,6 +151,7 @@ public class SpeakSDKManager : MonoBehaviour
         // Callback.
         Speak.Instance().SetOnTextOut(OnTextOut);
         Speak.Instance().SetOnMetaOut(OnMetaOut);
+        Speak.Instance().SetOnPlayEnd(OnPlayEnd);
     }
 
     // ---------------------------------------------------------------------------- //
@@ -191,6 +201,9 @@ public class SpeakSDKManager : MonoBehaviour
         string json = JsonUtility.ToJson(data);
         Speak.Instance().PutMeta(json);
 
+        CancelInvoke("AutoStopTask");
+        Interlocked.Increment(ref mDialogCounter);
+
         LogView(mes);
         mInputField.text = "";
     }
@@ -203,12 +216,14 @@ public class SpeakSDKManager : MonoBehaviour
     public void OnStart()
     {
         SetSpeakingFlag(true);
+        Invoke("AutoStopTask", TIMEOUT);
     }
 
 
     public void OnStop()
     {
         SetSpeakingFlag(false);
+        CancelInvoke("AutoStopTask");
     }
 
     public void OnFailed(int ecode, string failstr)
@@ -231,16 +246,32 @@ public class SpeakSDKManager : MonoBehaviour
     {
         var metaData = OnMetaOutJson.CreateFromJSON(metaText);
         // 再生テキスト内容
-        if (metaData.systemText.utterance != null && metaData.systemText.utterance != "")
+        if (!String.IsNullOrEmpty(metaData.systemText.utterance))
         {
             // スクロールビューにテキストを表示する
             LogView(metaData.systemText.utterance);
         }
         // 再生テキスト取得失敗時の表示内容
-        else if (metaData.systemText.expression != null && metaData.systemText.expression != "")
+        else if (!String.IsNullOrEmpty(metaData.systemText.expression))
         {
             // スクロールビューにテキストを表示する
             LogView(metaData.systemText.expression);
+        }
+
+        if (metaData.type == "speech_recognition_result")
+        {
+            // 対話の開始
+            CancelInvoke("AutoStopTask");
+            Interlocked.Increment(ref mDialogCounter);
+        }
+        else if (String.IsNullOrEmpty(metaData.systemText.utterance))
+        {
+            if (metaData.type == "nlu_result" &&
+                Interlocked.Decrement(ref mDialogCounter) == 0)
+            {
+                // 対話の終了
+                Invoke("AutoStopTask", TIMEOUT);
+            }
         }
     }
 
@@ -257,9 +288,23 @@ public class SpeakSDKManager : MonoBehaviour
         var speechMetaData = OnTextOutJson.CreateFromJSON(metaText);
         string viewText = "";
         viewText = MetaFindVoiceText(speechMetaData);
-        if (viewText != null && viewText != "")
+        if (!String.IsNullOrEmpty(viewText))
         {
             LogView(viewText);
+        }
+    }
+
+    // ---------------------------------------------------------------------------- //
+    //  合成音声再生終了時に呼ばれるメソッド
+    //  
+    //  登録例 : Speak.Instance().SetOnPlayEnd(OnPlayEnd);
+    //  引数(string) : 空文字
+    // ---------------------------------------------------------------------------- //
+    public void OnPlayEnd(string text)
+    {
+        if (Interlocked.Decrement(ref mDialogCounter) == 0)
+        {
+            Invoke("AutoStopTask", TIMEOUT);
         }
     }
 
@@ -274,7 +319,7 @@ public class SpeakSDKManager : MonoBehaviour
     // ---------------------------------------------------------------------------- //
     private void LogView(string viewText)
     {
-        if (viewText != null && viewText != "")
+        if (!String.IsNullOrEmpty(viewText))
         {
             mLogs += viewText;
             mLogs +=  "\n";
@@ -291,12 +336,25 @@ public class SpeakSDKManager : MonoBehaviour
         {
             foreach (OnTextOutJson.Sentence sentence in speechrec.sentences)
             {
-                if (sentence.converter_result != null && sentence.converter_result != "")
+                if (!String.IsNullOrEmpty(sentence.converter_result))
                 {
                     return sentence.converter_result;
                 }
             }
         }
         return null;
+    }
+
+    // ---------------------------------------------------------------------------- //
+    //
+    // SDKを自動停止させるための関数
+    //
+    // ---------------------------------------------------------------------------- //
+    private void AutoStopTask()
+    {
+        mContext.Post(__ =>
+        {
+            Speak.Instance().Stop(OnStop);
+        }, null);
     }
 }

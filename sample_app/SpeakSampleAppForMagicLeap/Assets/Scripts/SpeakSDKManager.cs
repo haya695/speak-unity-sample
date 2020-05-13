@@ -29,12 +29,17 @@ using UnityEngine;
 using NTTDocomo.Speak;
 using System;
 using System.Collections.Generic;
+using System.Threading;
 #if PLATFORM_ANDROID
 using UnityEngine.Android;
 #endif
 
 public class SpeakSDKManager : MonoBehaviour
 {
+    // 自動停止
+    private static readonly float TIMEOUT = 10.000f;//10000/ms
+    private int mDialogCounter = 0;
+    private SynchronizationContext mContext;
 
     void Start()
     {
@@ -46,6 +51,9 @@ public class SpeakSDKManager : MonoBehaviour
         Speak.Instance().SetOnPlayEnd(OnPlayEnd);
         Speak.Instance().SetOnTextOut(OnTextOut);
         Speak.Instance().SetOnMetaOut(OnMetaOut);
+
+        // Context.
+        mContext = SynchronizationContext.Current;
 
     }
 
@@ -88,7 +96,8 @@ public class SpeakSDKManager : MonoBehaviour
     // ---------------------------------------------------------------------------- //
     //  MicMuteOnStart ボタンを押下した時に呼び出される
     // ---------------------------------------------------------------------------- //
-    public void MicMuteOnStart() {
+    public void MicMuteOnStart()
+    {
         Debug.Log("MicMuteOnStart");
         Speak.Instance().SetMicMute(true);
     }
@@ -96,7 +105,8 @@ public class SpeakSDKManager : MonoBehaviour
     // ---------------------------------------------------------------------------- //
     //  MicUnmuteOnStartボタンを押下した時に呼び出される
     // ---------------------------------------------------------------------------- //
-    public void MicUnmuteOnStart() {
+    public void MicUnmuteOnStart()
+    {
         Debug.Log("MicUnmuteOnStart");
         Speak.Instance().SetMicMute(false);
     }
@@ -104,7 +114,8 @@ public class SpeakSDKManager : MonoBehaviour
     // ---------------------------------------------------------------------------- //
     //  PutMetaボタンを押下した時に呼び出される
     // ---------------------------------------------------------------------------- //
-    public void PutMeta() {
+    public void PutMeta()
+    {
         NluMetaData data = new NluMetaData();
         data.clientData = new ClientData();
         data.clientData.deviceInfo = new DeviceInfo();
@@ -116,12 +127,16 @@ public class SpeakSDKManager : MonoBehaviour
         string json = JsonUtility.ToJson(data);
         Debug.Log("PutMeta:" + json);
         Speak.Instance().PutMeta(json);
+
+        CancelInvoke("AutoStopTask");
+        Interlocked.Increment(ref mDialogCounter);
     }
 
     // ---------------------------------------------------------------------------- //
     //  Muteボタンを押下した時に呼び出される
     // ---------------------------------------------------------------------------- //
-    public void Mute() {
+    public void Mute()
+    {
         Debug.Log("Mute");
         Speak.Instance().Mute();
     }
@@ -129,7 +144,8 @@ public class SpeakSDKManager : MonoBehaviour
     // ---------------------------------------------------------------------------- //
     //  Unmuteボタンを押下した時に呼び出される
     // ---------------------------------------------------------------------------- //
-    public void Unmute() {
+    public void Unmute()
+    {
         Debug.Log("Unmute");
         Speak.Instance().Unmute();
     }
@@ -137,7 +153,8 @@ public class SpeakSDKManager : MonoBehaviour
     // ---------------------------------------------------------------------------- //
     //  CancelPlayボタンを押下した時に呼び出される
     // ---------------------------------------------------------------------------- //
-    public void CancelPlay() {
+    public void CancelPlay()
+    {
         Debug.Log("CancelPlay");
         Speak.Instance().CancelPlay();
     }
@@ -163,7 +180,7 @@ public class SpeakSDKManager : MonoBehaviour
     {
         
         Debug.Log("------------SDK Start");
-        
+        Invoke("AutoStopTask", TIMEOUT);
     }
 
 
@@ -175,6 +192,7 @@ public class SpeakSDKManager : MonoBehaviour
     public void OnStop()
     {
        Debug.Log("------------SDK Stop");
+        CancelInvoke("AutoStopTask");
     }
 
     // ---------------------------------------------------------------------------- //
@@ -192,12 +210,26 @@ public class SpeakSDKManager : MonoBehaviour
     public void OnMetaOut(string text)
     {
         var metaData = OnMetaOutJson.CreateFromJSON(text);
-        if (metaData.systemText != null &&
-            metaData.systemText.utterance != null &&
-            metaData.systemText.utterance != "")
+        if (!String.IsNullOrEmpty(metaData.systemText.utterance))
         {
             // システム発話文字列をログに出力
             Debug.Log("system text :" + metaData.systemText.utterance);
+        }
+        else
+        {
+            if (metaData.type == "nlu_result" &&
+                Interlocked.Decrement(ref mDialogCounter) == 0)
+            {
+                // 対話の終了
+                Invoke("AutoStopTask", TIMEOUT);
+            }
+        }
+
+        if (metaData.type == "speech_recognition_result")
+        {
+            // 対話の開始
+            CancelInvoke("AutoStopTask");
+            Interlocked.Increment(ref mDialogCounter);
         }
     }
 
@@ -207,9 +239,9 @@ public class SpeakSDKManager : MonoBehaviour
     //  登録例 : Speak.Instance().SetOnPlayStart(OnPlayStart);
     //  引数(string) : 空文字
     // ---------------------------------------------------------------------------- //
-    public void OnPlayStart(string text) {
+    public void OnPlayStart(string text)
+    {
         Debug.Log("-------OnPlayStart:");
-        Debug.Log(text);
     }
 
     // ---------------------------------------------------------------------------- //
@@ -218,9 +250,13 @@ public class SpeakSDKManager : MonoBehaviour
     //  登録例 : Speak.Instance().SetOnPlayEnd(OnPlayEnd);
     //  引数(string) : 空文字
     // ---------------------------------------------------------------------------- //
-    public void OnPlayEnd(string text) {
+    public void OnPlayEnd(string text)
+    {
         Debug.Log("-------OnPlayEnd:");
-        Debug.Log(text);
+        if (Interlocked.Decrement(ref mDialogCounter) == 0)
+        {
+            Invoke("AutoStopTask", TIMEOUT);
+        }
     }
 
     // ---------------------------------------------------------------------------- //
@@ -229,11 +265,13 @@ public class SpeakSDKManager : MonoBehaviour
     //  登録例 : Speak.Instance().SetOnTextOut(OnTextOut);
     //  引数(string) : JSON形式の対話テキスト情報
     // ---------------------------------------------------------------------------- //
-    public void OnTextOut(string text) {
+    public void OnTextOut(string text)
+    {
         var speechMetaData = OnTextOutJson.CreateFromJSON(text);
         string voiceText = "";
         voiceText = MetaFindVoiceText(speechMetaData);
-        if (voiceText != null && voiceText != "") {
+        if (!String.IsNullOrEmpty(voiceText))
+        {
             Debug.Log("voice text :" + voiceText);
         }
     }
@@ -241,14 +279,32 @@ public class SpeakSDKManager : MonoBehaviour
     // ---------------------------------------------------------------------------- //
     // JsonデータからTextを取得
     // ---------------------------------------------------------------------------- //
-    private string MetaFindVoiceText(OnTextOutJson speechrec) {
-        if (speechrec.sentences != null) {
-            foreach (OnTextOutJson.Sentence sentence in speechrec.sentences) {
-                if (sentence.converter_result != null && sentence.converter_result != "") {
+    private string MetaFindVoiceText(OnTextOutJson speechrec)
+    {
+        if (speechrec.sentences != null)
+        {
+            foreach (OnTextOutJson.Sentence sentence in speechrec.sentences)
+            {
+                if (!String.IsNullOrEmpty(sentence.converter_result))
+                {
                     return sentence.converter_result;
                 }
             }
         }
         return null;
+    }
+
+    // ---------------------------------------------------------------------------- //
+    //
+    // SDKを自動停止させるための関数
+    //
+    // ---------------------------------------------------------------------------- //
+    private void AutoStopTask()
+    {
+        mContext.Post(__ =>
+        {
+            // メインスレッドで実行する
+            Speak.Instance().Stop(OnStop);
+        }, null);
     }
 }
