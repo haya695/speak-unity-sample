@@ -1,3 +1,6 @@
+# SDK及びサンプルアプリの不具合に関して
+特定の環境にて現在配布中のSDK及びサンプルアプリに不具合がございました。SDKに関する不具合は[こちら](https://github.com/docomoDeveloperSupport/speak-unity-sdk/issues)、サンプルアプリに関する不具合は[こちら](https://github.com/docomoDeveloperSupport/speak-unity-sample/issues)をご覧下さい。
+
 # SpeakSDK for Unity サンプルアプリケーション
 
 本ソースコードは株式会社NTTドコモが提供するドコモAIエージェントAPI [SpeakSDK](https://github.com/docomoDeveloperSupport/speak-unity-sdk)のサンプルコードです。
@@ -124,6 +127,11 @@ SpeakSDKManager.cs の以下の行を、接続先に応じて変更してくだ�
 - 商用サーバ : `wss://dospf.aiplat.jp/ciel`
 
 `PUT_YOUR_DEVICE_TOKEN` を取得したデバイストークンに置き換えます。
+
+## AudioSourceの適用
+現在のサンプルアプリケーションではAudioSource経由での合成音声再生を行っておりません。
+AudioSourceにて合成音声を再生させる場合はSetAudioSourceを利用する必要があります。
+詳細はSDKの[ユーザーズガイド](https://github.com/docomoDeveloperSupport/speak-unity-sdk/blob/master/speak_unity_sdk_users_guide.pdf)p.28をご参照下さい。
 
 ## License
 
