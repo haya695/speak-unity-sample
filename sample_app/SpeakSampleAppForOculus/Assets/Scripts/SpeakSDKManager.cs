@@ -60,6 +60,9 @@ public class SpeakSDKManager : MonoBehaviour
     private int mDialogCounter  = 0;
     private SynchronizationContext mContext;
 
+    // AudioSource
+    private AudioSource mAudioSource;
+
     public void Start()
     {
 #if (PLATFORM_ANDROID)
@@ -69,6 +72,9 @@ public class SpeakSDKManager : MonoBehaviour
             Permission.RequestUserPermission(Permission.Microphone);
         }
 #endif
+
+        // AudioSourceコンポーネントの取得
+        mAudioSource = gameObject.GetComponent<AudioSource>();
 
         //Speakの初期化
         InitializeSpeakSDK();
@@ -147,6 +153,10 @@ public class SpeakSDKManager : MonoBehaviour
         Speak.Instance().SetOnTextOut(OnTextOut);
         Speak.Instance().SetOnMetaOut(OnMetaOut);
         Speak.Instance().SetOnPlayEnd(OnPlayEnd);
+
+        // AudioSource
+        Speak.Instance().SetAudioSource(mAudioSource);
+
     }
 
     // ---------------------------------------------------------------------------- //
@@ -317,7 +327,7 @@ public class SpeakSDKManager : MonoBehaviour
     // ---------------------------------------------------------------------------- //
     private void AutoStopTask()
     {
-        mContext.Post(__ =>
+        mContext?.Post(__ =>
         {
             Speak.Instance().Stop(OnStop);
         }, null);

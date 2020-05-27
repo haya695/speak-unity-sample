@@ -52,6 +52,9 @@ public class SpeakSDKManager : MonoBehaviour
         Speak.Instance().SetOnTextOut(OnTextOut);
         Speak.Instance().SetOnMetaOut(OnMetaOut);
 
+        // AudioSource
+        Speak.Instance().SetAudioSource(gameObject.GetComponent<AudioSource>());
+
         // Context.
         mContext = SynchronizationContext.Current;
 
@@ -301,7 +304,7 @@ public class SpeakSDKManager : MonoBehaviour
     // ---------------------------------------------------------------------------- //
     private void AutoStopTask()
     {
-        mContext.Post(__ =>
+        mContext?.Post(__ =>
         {
             // メインスレッドで実行する
             Speak.Instance().Stop(OnStop);
