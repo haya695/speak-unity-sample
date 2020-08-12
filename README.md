@@ -17,7 +17,7 @@ SpeakSDKを利用した音声対話処理やUIの実装例としてご利用く�
 
 1. 対象OS:Android, iOS, LuminOS, PC(macOS,Windows)
 1. Speak SDK(1.14.0以上)
-1. 対象Unityバージョン:2019.3.2f1
+1. 対象Unityバージョン:2019.4.4f1
 
 ## 推奨開発環境
 
@@ -49,30 +49,17 @@ Pythonスクリプトを利用してデバイストークンの取得を行っ�
 ### トライアルサーバ向け手順
 
 トライアルサーバ向けは GetTrialDeviceToken.py のスクリプトを使用します。
-スクリプト中における `device_id` はダミー値であるため、[Agentcraft](http://agentcraft.sebastien.ai/)の設定タグから、ご自身で取得した値に書き換えて実行してください。
-GetTrialDeviceToken.pyを実行すると以下の様にデバイスID登録用のURLを表示して登録の完了を待機します。
-
-```
-$ python3 GetTrialDeviceToken.py 
-Device ID :XXXXXXXXXXXXXXXXXXXX
-Please register above ID as your device on User Dashboard. https://users-v2.sebastien.ai
-下記リンク（↓）を使ってブラウザ等でデバイスIDを自分のアカウントに登録して下さい。
-https://users-v2.sebastien.ai/dashboard/device_registration?confirm=yes&device_id=XXXXXXXXXXXXXXXXXXXX
-
-Press any key AFTER registration >>>
-```
-
-ブラウザでURLにアクセスしてデバイスID登録を完了させて下さい。  
-登録にはGoogleアカウントまたはdアカウントによる認証が必要です。
-
-登録が完了したらEnterを入力して下さい。
-デバイストークンとリフレッシュトークンが標準出力に表示されます。
+スクリプト中における `CLIENT_SECRET` はダミー値であるため、[Agentcraft](http://agentcraft.sebastien.ai/)の設定タグから、ご自身で取得した値に書き換えて実行してください。
+GetTrialDeviceToken.pyを実行すると以下の様にデバイスID・デバイストークン・リフレッシュトークンが標準出力に表示されます。
 
 ```
 {
-    "device_token": "yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy", 
-    "refresh_token": "oooooooo-oooo-oooo-oooo-oooooooooooo", 
-    "status": "valid"
+  "device_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+}
+SAVE ./.trial_device_id : xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+{
+  "device_token": "yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy",
+  "refresh_token": "oooooooo-oooo-oooo-oooo-oooooooooooo"
 }
 SAVE ./.trial_device_token : yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy
 SAVE ./.trial_refresh_token : oooooooo-oooo-oooo-oooo-oooooooooooo

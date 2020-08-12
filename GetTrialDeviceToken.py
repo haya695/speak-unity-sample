@@ -37,22 +37,19 @@ import os
 import subprocess
 
 TARGET = "trial"
-CONFIG = {
-    "trial":{
-        "device_id":"XXXXXXXXXXXXXXXXXXXX",
-        "uds":"https://users-v2.sebastien.ai"
-    }
-}
+HOST="https://api-agentcraft.sebastien.ai"
+CLIENT_SECRET="xxxxxxxx-xxxx-xxxx-xxxxxxxxxxxx"
 
-def get_response(url):
-    response = None
-    if gmajor == '2':
-        response = urllib2.urlopen(url)
+def get_response_json(url, param=None, method="POST"):
+    headers = {"Content-Type" : "application/json"}
+    if param is not None:
+        json_data = json.dumps(param).encode("utf-8")
+        request = urllib.request.Request(url, data=json_data, headers=headers, method=method)
     else:
-        response = urllib.request.urlopen(url)
-    html = response.read()
-    print(html.decode())
-    return html
+        request = urllib.request.Request(url, headers=headers)
+    response = urllib.request.urlopen(request).read()
+    print(json.dumps(json.loads(response.decode()), indent=2))
+    return response
 
 
 def fileoutput(filename, output):
@@ -79,60 +76,51 @@ if __name__ == '__main__':
     args = sys.argv
     if 1 < len(args):
         TARGET = args[1]
-    if TARGET in CONFIG:
-        device_id = CONFIG[TARGET]["device_id"]
-        uds = CONFIG[TARGET]["uds"]
+    device_id = ""
+    if not fileexist("device_id"):   
+        try:
+            device_id_json = get_response_json(HOST + "/devices", {"client_secret" : CLIENT_SECRET})
+            device_id = json.loads(device_id_json.decode())["device_id"]
+        except urllib.error.HTTPError as e:
+            print("デバイスIDの取得に失敗しました。")
+            print(json.dumps({"status": e.code, "reason": e.reason}, indent=4))
+            exit()
+        fileoutput("device_id", device_id)
     else:
-        print(TARGET + " is illegal argument.")
-        exit()
-    
-    if device_id == "" or device_id is None:
-        print("Illegal Device_ID.. please make sure argument is set properly.")
-        exit()
-    else:
-        print("Device ID :" + device_id)
-        print("Please register above ID as your device on User Dashboard. " + uds)
-        print("下記リンク（↓）を使ってブラウザ等でデバイスIDを自分のアカウントに登録して下さい。")
-        print(uds + "/dashboard/device_registration?confirm=yes&device_id=" + device_id)
-        print("")
-        if gmajor == '2':
-            i = raw_input('Press any key AFTER registration >>> ')
-        else:
-            i = input('Press any key AFTER registration >>> ')
+        device_id = fileread("device_id")
 
     if not fileexist("device_token"):
-        device_token_json = get_response(uds + "/api/req_device_token?device_id=" + device_id)
-        device_token = json.loads(device_token_json.decode())["device_token"]
-        if device_token == "" or device_token is None:
-            print("Failed to get Device Token. Check User Dashboard to make sure the Device ID is registered properly.")
-            print("If the Device ID has been registered, please remove and register the Device ID again on Agentcraft.")
-            print("Device Tokenの取得に失敗しました。Device IDがUser Dashboardで正しく登録されているのか確認して下さい。")
-            print("もし登録されている場合は、一度登録済みIDをAgentcraftから削除してから再度登録して下さい。")
-            print("Device ID: " + device_id)
+        try: 
+            device_token_json = get_response_json(HOST + "/devices/token", {"device_id" : device_id})
+            device_token = json.loads(device_token_json.decode())["device_token"]
+        except urllib.error.HTTPError as e:
+            print("デバイストークンの取得に失敗しました。")
+            print(json.dumps({"status": e.code, "reason": e.reason}, indent=4))
             exit()
-        else:
-            fileoutput("device_token", device_token)
-            refresh_token = json.loads(device_token_json.decode())["refresh_token"]
-            fileoutput("refresh_token", refresh_token)
+        fileoutput("device_token", device_token)
+        refresh_token = json.loads(device_token_json.decode())["refresh_token"]
+        fileoutput("refresh_token", refresh_token)
     else:
         device_token = fileread("device_token")
         refresh_token = fileread("refresh_token")
 
         # DeviceToken validation
-        validate_result = get_response(uds + "/api/validate_device_token?device_token=" + device_token)
+        try: 
+            validate_result = get_response_json(HOST + "/devices/token/status?device_token=" + device_token)
+        except urllib.error.HTTPError as e:
+            print("デバイストークンの検証に失敗しました。")
+            print(json.dumps({"status": e.code, "reason": e.reason}, indent=4)) 
+            exit()
         status = json.loads(validate_result.decode())["status"]
         if status != "valid":
             # Update DeviceToken by RefreshToken
-            device_token_json = get_response(uds + "/api/update_device_token?refresh_token=" + refresh_token)
+            device_token_json = get_response_json(HOST + "/devices/token/refresh", {"refresh_token" : refresh_token})
             device_token = json.loads(device_token_json.decode())["device_token"]
             if device_token == "" or device_token is None:
                 os.remove("./." + TARGET + "_device_token")
                 os.remove("./." + TARGET + "_refresh_token")
-                print("Failed to update Device Token by Refresh Token. Check User Dashboard to make sure the Device ID is registered properly.")
-                print("If the Device ID has been registered, please remove and register the Device ID again on Agentcraft.")
-                print("Device Tokenの更新に失敗しました。Device IDがUser Dashboardで正しく登録されているのか確認して下さい。")
-                print("もし登録されている場合は、一度登録済みIDをAgentcraftから削除してから再度登録して下さい。")
-                print("Device ID: " + device_id)
+                print("デバイストークンの更新に失敗しました。")
+                print(json.dumps(device_token_json, indent=4))
             else:
                 fileoutput("device_token", device_token)
                 refresh_token = json.loads(device_token_json.decode())["refresh_token"]
